@@ -49,9 +49,14 @@
          ((or ~@(map #(compile-route segments %) (partition 2 forms))
             pass) req#)))))
 
+(defn- method-not-allowed-form [allowed-methods]
+  (let [allow (apply str (interpose ", " (map #(.toUpperCase (name %) java.util.Locale/ENGLISH) allowed-methods)))]
+    `(constantly {:status 405 :headers {"Allow" ~allow}})))  
+
 (defn- compile-resource [spec]
-  (let [else-form (:any spec `pass)
-        spec (dissoc spec :any :deny)] 
+  (let [else-form (:any spec)
+        spec (dissoc spec :any)
+        else-form (or else-form (method-not-allowed-form (keys spec)))] 
     `(fn [req#]
        ((condp = (:request-method req#)
           ~@(mapcat (fn [[k v]] [k (compile-handler v)]) spec)
