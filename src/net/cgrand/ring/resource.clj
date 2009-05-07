@@ -36,14 +36,14 @@
                    [v (list f alias)])]
     [simple-route (vec args) bindings]))
 
-(defn- compile-handler [form]
-  (cond 
-    (vector? form) `(app ~@form) 
+(defn- compile-handler-shorthand [form]
+  (cond
+    (vector? form) `(app ~@form)
     (map? form) `(app ~@(apply concat form)) 
-    :else form))
-    
+    :else `(app ~form)))
+                  
 (defn- compile-route [segments [route form]]
-  (let [route-body (compile-handler form) 
+  (let [route-body (compile-handler-shorthand form) 
         [simple-route args bindings] (extract-args route)
         etc-sym (when (prefix-route? route) (gensym "etc"))
         route-body (if etc-sym `(rebase-uri ~etc-sym ~route-body) route-body)
@@ -57,7 +57,7 @@
     `(when-let [~args (match-route ~segments '~simple-route)]
        ~(emit-bindings bindings)))) 
 
-(defn- compile-routes [forms]
+(defn- compile-router [forms]
   (let [segments (gensym "segments")
         req (gensym "req")
         routes+forms (partition 2 forms)
@@ -76,14 +76,18 @@
   (let [allow (apply str (interpose ", " (map #(.toUpperCase (name %) java.util.Locale/ENGLISH) allowed-methods)))]
     `(constantly {:status 405 :headers {"Allow" ~allow}})))  
 
-(defn- compile-resource [spec]
-  (let [else-form (:any spec)
+(defn- compile-method-dispatch [spec]
+  (let [spec (apply hash-map spec)
+        else-form (:any spec)
         spec (dissoc spec :any)
         else-form (or else-form (method-not-allowed-form (keys spec)))] 
     `(fn [req#]
        ((condp = (:request-method req#)
-          ~@(mapcat (fn [[k v]] [k (compile-handler v)]) spec)
+          ~@(mapcat (fn [[k v]] [k (compile-handler-shorthand v)]) spec)
           ~else-form) req#))))
+
+(defn- compile-text [s]
+  `(constantly {:status 200 :headers {"Content-Type" "text/plain;charset=UTF-8"} :body (str ~@s)}))
         
 (defmacro app [& forms]
   (let [[middlewares etc] (split-with #(or (seq? %) (symbol? %)) forms)
@@ -94,8 +98,9 @@
             [(rest middlewares) (list (first middlewares))])
         middlewares (vec middlewares)
         handler (cond
-                  (vector? x) (compile-routes etc)
-                  (keyword? x) (compile-resource (apply hash-map etc))
+                  (string? x) (compile-text etc)
+                  (vector? x) (compile-router etc)
+                  (keyword? x) (compile-method-dispatch etc)
                   :else x)]
     (if (seq middlewares)
       `(-> ~handler ~middlewares)
@@ -104,48 +109,59 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;    
 (comment
  ; an app can simply wrap a handler
- (app 
-   (fn [req] {:status 200 :headers {"Content-Type" "text/html"}   
-              :body "<h3>Hello World from Ring</h3>"}))
+ (app
+   (fn [req] {:status 200 :headers {"Content-Type" "text/html"}
+              :body "<h3>Hello World</h3>"}))
         
  ; an app can declare routes
- (app 
-   ["hello" name] 
-     (fn [req] {:status 200 :headers {"Content-Type" "text/html"}   
-                :body (str "<h3>Hello " name " from Ring</h3>")}))
+ (app
+   ["hello" name]
+     (fn [req] {:status 200 :headers {"Content-Type" "text/html"}
+                :body (str "<h3>Hello " name "</h3>")}))
                 
  ; routes can be nested:
- (app 
+ (app
    ["hello" &]
      (app
-       [name] 
-         (fn [req] {:status 200 :headers {"Content-Type" "text/html"}   
-                  :body (str "<h3>Hello " name " from Ring</h3>")})))
-
- ; or:
- (app 
-   ["hello" &]
-     [[name] 
-        (fn [req] {:status 200 :headers {"Content-Type" "text/html"}   
-                   :body (str "<h3>Hello " name " from Ring</h3>")})])
+       [name]
+         (fn [req] {:status 200 :headers {"Content-Type" "text/html"}
+                  :body (str "<h3>Hello " name "</h3>")})))
+ 
+ ; params can be parsed/validated
+ (app
+   ["by-date" [[year month day] parse-date]] ...)
+ 
+ ; and hence composed:
+ (def by-name
+   (app
+     [name]
+       (fn [req] {:status 200 :headers {"Content-Type" "text/html"}
+                  :body (str "<h3>Hello " name "</h3>")})))
+ 
+ (app
+   ["hello" &] by-name
+   ["greet" &] by-name)
+ 
+ ;an app knows about methods: (without any, you get a 405 method Not Allowed)
+  (app
+    :get (fn [req] {:status 200 :headers {"Content-Type" "text/html"}
+                  :body (str "GET!")})
+    :post (fn [req] {:status 200 :headers {"Content-Type" "text/html"}
+                  :body (str "POST!")}
+    :any (fn [req] {:status 200 :headers {"Content-Type" "text/html"}
+                  :body (str "ANYTHING ELSE!")}))
  
  
- ;an app knows about methods:
+ ;an app can use existing middlewares (eg from compojure)
   (app
-    :get (fn [req] {:status 200 :headers {"Content-Type" "text/html"}   
-                  :body (str "GET!")})
-    :post (fn [req] {:status 200 :headers {"Content-Type" "text/html"}   
-                  :body (str "POST!")}))
-
- ;an app knows about methods:
-  (app
-    :get (fn [req] {:status 200 :headers {"Content-Type" "text/html"}   
-                  :body (str "GET!")})
-    :any (fn [req] {:status 200 :headers {"Content-Type" "text/html"}   
-                  :body (str "NOT GET!")}))
-)  
+    with-multipart
+    (with-session :memory)
+    ["account" &]
+      (app
+        [] {:get (show-account (session :user))}
+        ["upload-avatar"] {:post (save-upload-avatar (params :avatar-upload))})))  
     
-    
+)    
     
     
     
