@@ -58,11 +58,19 @@
        ~(emit-bindings bindings)))) 
 
 (defn- compile-routes [forms]
-  (let [segments (gensym "segments")] 
-    `(fn [req#] 
-       (let [~segments (uri-segments req#)]
-         ((or ~@(map #(compile-route segments %) (partition 2 forms))
-            not-found) req#)))))
+  (let [segments (gensym "segments")
+        req (gensym "req")
+        routes+forms (partition 2 forms)
+        default-form ((apply array-map forms) '[&])
+        routes+forms (if default-form
+                       routes+forms
+                       (concat routes+forms [['[&] `not-found]]))
+        emit-match (fn [route+form]
+                     `(when-let [handler# ~(compile-route segments route+form)]
+                        (handler# ~req)))] 
+    `(fn [~req] 
+       (let [~segments (uri-segments ~req)]
+         (or ~@(map emit-match routes+forms))))))
 
 (defn- method-not-allowed-form [allowed-methods]
   (let [allow (apply str (interpose ", " (map #(.toUpperCase (name %) java.util.Locale/ENGLISH) allowed-methods)))]
