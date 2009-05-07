@@ -2,21 +2,33 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defn uri-segments [{:keys [#^String uri]}]
-  (rest (map #(java.net.URLDecoder/decode % "UTF-8") (.split uri "/"))))
+(defn uri-segments
+ "Splits the uri of the given request map around / and decode segments." 
+ [{:keys [#^String uri]}]
+  (rest (map #(java.net.URLDecoder/decode % "UTF-8") (.split uri "/" -1))))
+  
+(defn uri
+ "Turns a seq of decoded segment into an uri."  
+ [segments]
+  (apply str "/" (interpose "/" (map #(java.net.URLEncoder/encode % "UTF-8") segments))))
 
 (defn- prefix-route? [route]
   (= '& (peek route)))
 
-(def pass (constantly nil))
+(def #^{:doc "Handler that causes the framework to fall through the next handler"} 
+  pass (constantly nil))
 
-(def not-found (constantly {:status 404}))
+(def #^{:doc "Handler that always return a 404 Not Found status."} 
+  not-found (constantly {:status 404}))
 
-(defn rebase-uri [segments handler]
-  (fn [{:keys [uri] :as req}]
-    (handler (assoc req :uri (apply str "/" (interpose "/" segments))))))
+(defn with-varied-request
+ "Middleware that passes (apply f request args) to handler instead of request." 
+ [handler f & args]
+  #(handler (apply f % args)))
 
-(defn match-route [segments route]
+(defn match-route
+ "Returns a vector (possibly empty) of matched segments or nil if the route doesn't match." 
+ [segments route]
   (loop [r [] segments segments route route]
     (if-let [x (first route)]
       (cond
@@ -33,7 +45,9 @@
         params+alias (map #(if (vector? %) (conj % (gensym)) %) params)  
         args (map #(if (vector? %) (% 2) %) params+alias)
         bindings (for [p params+alias :when (vector? p) :let [[v f alias] p]]
-                   [v (list f alias)])]
+                   [v (if (instance? java.util.regex.Pattern f)
+                        (list `re-matches f alias)
+                        (list f alias))])]
     [simple-route (vec args) bindings]))
 
 (defn- compile-handler-shorthand [form]
@@ -43,17 +57,17 @@
     :else `(app ~form)))
                   
 (defn- compile-route [segments [route form]]
-  (let [route-body (compile-handler-shorthand form) 
+  (let [handler (compile-handler-shorthand form) 
         [simple-route args bindings] (extract-args route)
         etc-sym (when (prefix-route? route) (gensym "etc"))
-        route-body (if etc-sym `(rebase-uri ~etc-sym ~route-body) route-body)
+        handler (if etc-sym `(with-varied-request ~handler assoc :uri (uri ~etc-sym)) handler)
         args (if etc-sym (conj args etc-sym) args)
         emit-bindings 
           (fn emit-bindings [bindings]
             (if-let [[binding & etc] (seq bindings)]
               `(when-let ~binding
                  ~(emit-bindings etc))
-              route-body))]
+              handler))]
     `(when-let [~args (match-route ~segments '~simple-route)]
        ~(emit-bindings bindings)))) 
 
@@ -89,7 +103,9 @@
 (defn- compile-text [s]
   `(constantly {:status 200 :headers {"Content-Type" "text/plain;charset=UTF-8"} :body (str ~@s)}))
         
-(defmacro app [& forms]
+(defmacro app
+ "The main form."
+ [& forms]
   (let [[middlewares etc] (split-with #(or (seq? %) (symbol? %)) forms)
         middlewares (reverse middlewares)
         [middlewares [x :as etc]] 
