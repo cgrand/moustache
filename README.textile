@@ -32,10 +32,10 @@ You can simply wrap an handler into middlewares:
 <pre>
   (app
     middleware1
-    (middleware2 arg) 
-    my-handler) 
+    (middleware2 arg)
+    my-handler)
   ; equivalent to (-> my-handler (middleware2 arg) middleware1)
-  ; ie (middleware1 (middleware2 my-handler arg)) 
+  ; ie (middleware1 (middleware2 my-handler arg))
 </pre> 
 
 Note that *every usage of @app@ supports middleware-wrapping*.
