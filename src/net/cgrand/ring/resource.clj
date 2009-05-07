@@ -26,7 +26,13 @@
       (when-not (seq segments) r))))
       
 (defn- extract-args [route]
-  (vec (remove #(or (string? %) (= '& %)) route)))
+  (let [params (remove #(or (string? %) (= '& %)) route)
+        simple-route (map #(if (or (string? %) (= '& %)) % '_) route)
+        params+alias (map #(if (vector? %) (conj % (gensym)) %) params)  
+        args (map #(if (vector? %) (% 2) %) params+alias)
+        bindings (for [p params+alias :when (vector? p) :let [[v f alias] p]]
+                   [v (list f alias)])]
+    [simple-route (vec args) bindings]))
 
 (defn- compile-handler [form]
   (cond 
@@ -36,11 +42,18 @@
     
 (defn- compile-route [segments [route form]]
   (let [route-body (compile-handler form) 
-        args (extract-args route)
+        [simple-route args bindings] (extract-args route)
         etc-sym (when (prefix-route? route) (gensym "etc"))
         route-body (if etc-sym `(rebase-uri ~etc-sym ~route-body) route-body)
-        args (if etc-sym (conj args etc-sym) args)]
-    `(when-let [~args (match-route ~segments '~route)] ~route-body))) 
+        args (if etc-sym (conj args etc-sym) args)
+        emit-bindings 
+          (fn emit-bindings [bindings]
+            (if-let [[binding & etc] (seq bindings)]
+              `(when-let ~binding
+                 ~(emit-bindings etc))
+              route-body))]
+    `(when-let [~args (match-route ~segments '~simple-route)]
+       ~(emit-bindings bindings)))) 
 
 (defn- compile-routes [forms]
   (let [segments (gensym "segments")] 
