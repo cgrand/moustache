@@ -1,0 +1,46 @@
+h1. XXXX
+
+<pre>
+  (app ["hi"] {:get "Hello World!"})
+</pre>
+
+XXXX is a micro web framework/internal DSL to wire Ring handlers and middlewares.
+
+h2. How micro is it?
+
+Well there's only one macro you need to know: @app@. 
+
+Every other public var is public only because @app@ needs it in its expansion.
+
+h2. The @app@ macro
+
+A @(app ...)@ form returns a Ring application (handler).
+
+There's currently four usages of @app@:
+* to wrap a Ring handler,
+* to define routes,
+* to dispatch on HTTP methods
+* and to render plain text.
+
+h3. Wrapping an existing Ring handler
+
+<pre>
+  (app my-handler) ; identity, returns my-handler
+</pre> 
+
+You can simply wrap an handler into middlewares:
+<pre>
+  (app
+    middleware1
+    (middleware2 arg) 
+    my-handler) 
+  ; equivalent to (-> my-handler (middleware2 arg) middleware1)
+  ; ie (middleware1 (middleware2 my-handler arg)) 
+</pre> 
+
+Note that *every usage of @app@ supports middleware-wrapping*.
+
+h3. Routes
+
+
+ 
