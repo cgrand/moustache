@@ -10,6 +10,8 @@
 
 (def pass (constantly nil))
 
+(def not-found (constantly {:status 404}))
+
 (defn rebase-uri [segments handler]
   (fn [{:keys [uri] :as req}]
     (handler (assoc req :uri (apply str "/" (interpose "/" segments))))))
@@ -60,7 +62,7 @@
     `(fn [req#] 
        (let [~segments (uri-segments req#)]
          ((or ~@(map #(compile-route segments %) (partition 2 forms))
-            pass) req#)))))
+            not-found) req#)))))
 
 (defn- method-not-allowed-form [allowed-methods]
   (let [allow (apply str (interpose ", " (map #(.toUpperCase (name %) java.util.Locale/ENGLISH) allowed-methods)))]
