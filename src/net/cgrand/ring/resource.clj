@@ -28,15 +28,18 @@
 (defn- extract-args [route]
   (vec (remove #(or (string? %) (= '& %)) route)))
 
+(defn- compile-handler [form]
+  (cond 
+    (vector? form) `(app ~@form) 
+    (map? form) `(app ~@(apply concat form)) 
+    :else form))
+    
 (defn- compile-route [segments [route form]]
-  (let [route-body (cond 
-                     (vector? form) `(app ~@form) 
-                     (map? form) `(app ~@(apply concat form)) 
-                     :else `(app ~form))
+  (let [route-body (compile-handler form) 
         args (extract-args route)
         etc-sym (when (prefix-route? route) (gensym "etc"))
-        args (if etc-sym (conj args etc-sym) args)
-        route-body (if etc-sym `(rebase-uri ~etc-sym ~route-body) route-body)]
+        route-body (if etc-sym `(rebase-uri ~etc-sym ~route-body) route-body)
+        args (if etc-sym (conj args etc-sym) args)]
     `(when-let [~args (match-route ~segments '~route)] ~route-body))) 
 
 (defn- compile-routes [forms]
@@ -51,7 +54,7 @@
         spec (dissoc spec :any :deny)] 
     `(fn [req#]
        ((condp = (:request-method req#)
-          ~@(apply concat spec)
+          ~@(mapcat (fn [[k v]] [k (compile-handler v)]) spec)
           ~else-form) req#))))
         
 (defmacro app [& forms]
