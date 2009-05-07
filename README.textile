@@ -1,10 +1,10 @@
-h1. XXXX
+h1. Moustache
 
 <pre>
   (app ["hi"] {:get "Hello World!"})
 </pre>
 
-XXXX is a micro web framework/internal DSL to wire Ring handlers and middlewares.
+Moustache is a micro web framework/internal DSL to wire Ring handlers and middlewares.
 
 h2. How micro is it?
 
@@ -42,5 +42,27 @@ Note that *every usage of @app@ supports middleware-wrapping*.
 
 h3. Routes
 
+h4. Basics
+With Moustache you don't write routes as encoded uri (eg @"/happy%20birthday/Mr%20President"@), you write vectors of decoded segments (eg @["happy birthday" "Mr President"]@).
 
- 
+<pre>
+  (app ["foo"] my-handler) ; will route requests to "/foo" to my-handler
+  (app ["foo" ""] my-handler) ; will route requests to "/foo/" to my-handler
+  (app ["foo" "bar"] my-handler) ; will route requests to "/foo/bar" to my-handler
+  (app ["foo" &] my-handler) ; will route requests to "/foo", "/foo/", "/foo/bar" and "/foo/bar/baz/" to my-handler (and will chop "/foo" off from the uri)
+  (app ["foo" name] my-handler) ; will route requests to "/foo/", "/foo/bar" to my-handler and bind @name@ (a local) to the matched segment (eg "" or "bar")
+  (app ["foo" x & xs] my-handler) ; "/foo/bar/baz/bloom" will bind x to bar and xs to ["baz" "bloom"]
+</pre>
+
+h4. Route validation/destructuring
+<pre>
+  (defn parse-int [s]; returns nil if s does not represent an integer
+    (try 
+      (Integer/parseInt s)
+      (catch Exception e)))
+
+  (app ["order" [id parse-int]] my-handler) ; for "/order/134" @id@ will be bind to 134 (not "134"), this route will not match "/order/abc".
+  
+  (app ["agenda" [[_ year month day] #"(\d{4})-(\d{2})-(\d{2})"]] 
+    {:get [month "-" day "-" year " agenda"]})
+</pre>
