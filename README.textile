@@ -8,7 +8,7 @@ Moustache is a micro web framework/internal DSL to wire Ring handlers and middle
 
 h2. How micro is it?
 
-Well there's only one macro you need to know: @app@. 
+Well, there's only one macro you need to know: @app@. 
 
 Every other public var is public only because @app@ needs it in its expansion.
 
@@ -44,7 +44,7 @@ h3. Routes
 
 h4. Basics
 
-With Moustache you don't write routes as encoded uri (eg @"/happy%20birthday/Mr%20President"@), you write vectors of decoded segments (eg @["happy birthday" "Mr President"]@).
+With Moustache you don't write routes as encoded uri (eg @"/Thank%20you%20Mario/But%20our%20princess%20is%20in%20another%20castle"@), you write vectors of decoded segments (eg @["Thank you Mario" "But our princess is in another castle"]@).
 
 <pre>
   (app ["foo"] my-handler) ; will route requests to "/foo" to my-handler
@@ -55,16 +55,65 @@ With Moustache you don't write routes as encoded uri (eg @"/happy%20birthday/Mr%
   (app ["foo" x & xs] my-handler) ; "/foo/bar/baz/bloom" will bind x to bar and xs to ["baz" "bloom"]
 </pre>
 
+You can catch all URIs with the route [&]. If you don't provide a handler for [&] and there's no handler for a request Moustache sends a 404 (not found) response.
+
 h4. Route validation/destructuring
 
 <pre>
-  (defn parse-int [s]; returns nil if s does not represent an integer
+  (defn integer [s]
+   "returns nil if s does not represent an integer
     (try 
       (Integer/parseInt s)
       (catch Exception e)))
 
-  (app ["order" [id parse-int]] my-handler) ; for "/order/134" @id@ will be bind to 134 (not "134"), this route will not match "/order/abc".
+  (app ["order" [id integer]] my-handler) ; for "/order/134" @id@ will be bind to 134 (not "134"), this route will not match "/order/abc".
   
   (app ["agenda" [[_ year month day] #"(\d{4})-(\d{2})-(\d{2})"]] 
     {:get [month "-" day "-" year " agenda"]})
 </pre>
+
+h4. Fall through
+
+The routes are tried in order until one route matches the request uri *and* the associated handler does not return nil.
+
+That's why:
+
+<pre>
+  (app 
+    ["foo" &] (app ["bar"] handler1)
+    ["foo" "baz"] handler2)
+<pre>
+
+returns a 404 for /foo/baz: the nested @app@ form returns a 404 for /baz and this 404 bubbles up.
+
+You can prevent such behavior by writing:
+
+<pre>
+  (app 
+    ["foo" &] (app 
+                ["bar"] handler1
+                [&] pass)
+    ["foo" "baz"] handler2)
+<pre>
+
+ 
+
+h3. Method dispatch
+
+<pre>
+  (app
+    :get handler-for-get
+    :post handler-for-post)
+</pre>
+
+You can add a catch-all using the :any keyword.
+
+If you don't specify a handler for :any, Moustache sends a 405 response (method not allowed).
+
+h3. Shorthands
+
+When the right-hand form of a route or of a method dispatch is a @(app ...)@ form, you can write the form as a vector: @(app ["foo" &] (app ["bar"] handler))@ can be shortened to @(app ["foo" &] [["bar"] handler])@.
+
+Besides when the right-hand form is a method dispatch without middlewares you can write the form as a map:  @(app ["foo"] (app :get handler))@ can be shortened to @(app ["foo"] {:get handler})@.
+
+ 
