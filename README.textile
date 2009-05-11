@@ -12,6 +12,10 @@ Well, there's only one macro you need to know: @app@.
 
 Every other public var is public only because @app@ needs it in its expansion.
 
+h2. Walkthrough
+
+http://gist.github.com/109955
+
 h2. The @app@ macro
 
 A @(app ...)@ form returns a Ring application (handler).
@@ -116,4 +120,3 @@ When the right-hand form of a route or of a method dispatch is a @(app ...)@ for
 
 Besides when the right-hand form is a method dispatch without middlewares you can write the form as a map:  @(app ["foo"] (app :get handler))@ can be shortened to @(app ["foo"] {:get handler})@.
 
- 
