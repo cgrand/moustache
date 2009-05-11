@@ -43,6 +43,7 @@ Note that *every usage of @app@ supports middleware-wrapping*.
 h3. Routes
 
 h4. Basics
+
 With Moustache you don't write routes as encoded uri (eg @"/happy%20birthday/Mr%20President"@), you write vectors of decoded segments (eg @["happy birthday" "Mr President"]@).
 
 <pre>
@@ -55,6 +56,7 @@ With Moustache you don't write routes as encoded uri (eg @"/happy%20birthday/Mr%
 </pre>
 
 h4. Route validation/destructuring
+
 <pre>
   (defn parse-int [s]; returns nil if s does not represent an integer
     (try 
