@@ -32,7 +32,7 @@ h3. Wrapping an existing Ring handler
   (app my-handler) ; identity, returns my-handler
 </pre> 
 
-You can simply wrap an handler into middlewares:
+You can simply wrap a handler into middlewares:
 <pre>
   (app
     middleware1
@@ -40,7 +40,7 @@ You can simply wrap an handler into middlewares:
     my-handler)
   ; equivalent to (-> my-handler (middleware2 arg) middleware1)
   ; ie (middleware1 (middleware2 my-handler arg))
-</pre> 
+</pre>
 
 Note that *every usage of @app@ supports middleware-wrapping*.
 
@@ -59,7 +59,7 @@ With Moustache you don't write routes as encoded uri (eg @"/Thank%20you%20Mario/
   (app ["foo" x & xs] my-handler) ; "/foo/bar/baz/bloom" will bind x to bar and xs to ["baz" "bloom"]
 </pre>
 
-You can catch all URIs with the route [&]. If you don't provide a handler for [&] and there's no handler for a request Moustache sends a 404 (not found) response.
+You can catch all URIs with the route <code>[&]</code>. If you don't provide a handler for <code>[&]</code> and there's no handler for a request Moustache sends a 404 (not found) response.
 
 h4. Route validation/destructuring
 
@@ -116,7 +116,7 @@ If you don't specify a handler for :any, Moustache sends a 405 response (method 
 
 h3. Shorthands
 
-When the right-hand form of a route or of a method dispatch is a @(app ...)@ form, you can write the form as a vector: @(app ["foo" &] (app ["bar"] handler))@ can be shortened to @(app ["foo" &] [["bar"] handler])@.
+When the right-hand form of a route or of a method dispatch is a @(app ...)@ form, you can write the form as a vector: <code>(app ["foo" &] (app ["bar"] handler))</code> can be shortened to <code>(app ["foo" &] [["bar"] handler])</code>.
 
-Besides when the right-hand form is a method dispatch without middlewares you can write the form as a map:  @(app ["foo"] (app :get handler))@ can be shortened to @(app ["foo"] {:get handler})@.
+Besides when the right-hand form is a method dispatch without middlewares you can write the form as a map:  <code>(app ["foo"] (app :get handler))</code> can be shortened to <code>(app ["foo"] {:get handler})</code>.
 
