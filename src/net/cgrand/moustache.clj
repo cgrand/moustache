@@ -31,6 +31,12 @@
  [handler f & args]
   #(apply f (handler %) args))
 
+(defn- regex? [x]
+  (instance? java.util.regex.Pattern x))
+
+(defn- simple-segment? [x]
+  (or (string? x) (regex? x) (= '& x)))
+  
 (defn match-route
  "Returns a vector (possibly empty) of matched segments or nil if the route doesn't match." 
  [segments route]
@@ -39,20 +45,23 @@
       (cond
         (string? x) (when (= x (first segments)) 
                       (recur r (rest segments) (rest route)))
+        (regex? x) (when (re-matches x (first segments))
+                      (recur r (rest segments) (rest route)))
         (= '& x) (conj r segments)
         :else (when-let [segment (first segments)]
                 (recur (conj r segment) (rest segments) (rest route))))
       (when-not (seq segments) r))))
-      
+
 (defn- extract-args [route]
-  (let [params (remove #(or (string? %) (= '& %)) route)
-        simple-route (map #(if (or (string? %) (= '& %)) % '_) route)
+  (let [params (remove simple-segment? route)
+        simple-route (map #(if (simple-segment? %) % '_) route)
         params+alias (map #(if (vector? %) (conj % (gensym)) %) params)  
         args (map #(if (vector? %) (% 2) %) params+alias)
         bindings (for [p params+alias :when (vector? p) :let [[v f alias] p]]
-                   [v (if (instance? java.util.regex.Pattern f)
-                        (list `re-matches f alias)
-                        (list f alias))])]
+                   [v (cond
+                        (regex? f) (list `re-matches f alias)
+                        (string? f) `(when (= ~f ~alias) ~f)
+                        :else (list f alias))])]
     [simple-route (vec args) bindings]))
 
 (defn- compile-handler-shorthand [form]
