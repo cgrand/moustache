@@ -82,7 +82,7 @@ That's why:
   (app 
     ["foo" &] (app ["bar"] handler1)
     ["foo" "baz"] handler2)
-<pre>
+</pre>
 
 returns a 404 for /foo/baz: the nested @app@ form returns a 404 for /baz and this 404 bubbles up.
 
@@ -94,7 +94,7 @@ You can prevent such behavior by writing:
                 ["bar"] handler1
                 [&] pass)
     ["foo" "baz"] handler2)
-<pre>
+</pre>
 
  
 
