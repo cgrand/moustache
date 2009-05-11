@@ -21,10 +21,15 @@
 (def #^{:doc "Handler that always return a 404 Not Found status."} 
   not-found (constantly {:status 404}))
 
-(defn with-varied-request
+(defn alter-request
  "Middleware that passes (apply f request args) to handler instead of request." 
  [handler f & args]
   #(handler (apply f % args)))
+
+(defn alter-response
+ "Middleware that returns (apply f response args) instead of response." 
+ [handler f & args]
+  #(apply f (handler %) args))
 
 (defn match-route
  "Returns a vector (possibly empty) of matched segments or nil if the route doesn't match." 
@@ -60,7 +65,7 @@
   (let [handler (compile-handler-shorthand form) 
         [simple-route args bindings] (extract-args route)
         etc-sym (when (prefix-route? route) (gensym "etc"))
-        handler (if etc-sym `(with-varied-request ~handler assoc :uri (uri ~etc-sym)) handler)
+        handler (if etc-sym `(alter-request ~handler assoc :uri (uri ~etc-sym)) handler)
         args (if etc-sym (conj args etc-sym) args)
         emit-bindings 
           (fn emit-bindings [bindings]
