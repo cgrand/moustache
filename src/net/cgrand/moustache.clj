@@ -1,4 +1,4 @@
-(ns net.cgrand.ring.resource)
+(ns net.cgrand.moustache)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
