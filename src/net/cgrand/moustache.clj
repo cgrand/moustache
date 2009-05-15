@@ -137,14 +137,13 @@
           (if (seq etc) 
             [middlewares etc]
             [(rest middlewares) (list (first middlewares))])
-        middlewares (vec middlewares)
         handler (cond
                   (string? x) (compile-text etc)
                   (vector? x) (compile-router etc)
                   (keyword? x) (compile-method-dispatch etc)
                   :else x)]
     (if (seq middlewares)
-      `(-> ~handler ~middlewares)
+      `(-> ~handler ~@middlewares)
       handler))) 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;    
