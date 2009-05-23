@@ -126,7 +126,10 @@
           ~else-form) req#))))
 
 (defn- compile-text [s]
-  `(constantly {:status 200 :headers {"Content-Type" "text/plain;charset=UTF-8"} :body (str ~@s)}))
+  `(fn [_#] {:status 200 :headers {"Content-Type" "text/plain;charset=UTF-8"} :body (str ~@s)}))
+        
+(defn compile-response-map [m]
+  `(fn [_#] ~m))
         
 (defmacro app
  "The main form."
@@ -141,6 +144,7 @@
                   (string? x) (compile-text etc)
                   (vector? x) (compile-router etc)
                   (keyword? x) (compile-method-dispatch etc)
+                  (map? x) (compile-response-map x)
                   :else x)]
     (if (seq middlewares)
       `(-> ~handler ~@middlewares)
