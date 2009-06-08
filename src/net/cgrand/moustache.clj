@@ -23,8 +23,13 @@
  [segments]
   (apply str "/" (interpose "/" (map #(java.net.URLEncoder/encode % "UTF-8") segments))))
 
-(defn- prefix-route? [route]
-  (= '& (peek route)))
+(defn- split-route [route default-etc]
+  (if-let [[l ll] (rseq route)]
+    (cond
+      (= '& l) [(pop route) default-etc]
+      (= '& ll) [(-> route pop pop) l]
+      :else [route nil])
+    [[""] nil]))
 
 (def #^{:doc "Handler that causes the framework to fall through the next handler"} 
   pass (constantly nil))
@@ -68,12 +73,12 @@
         simple-route (map #(if (simple-segment? %) % '_) route)
         params+alias (map #(if (vector? %) (conj % (gensym)) %) params)  
         args (map #(if (vector? %) (% 2) %) params+alias)
-        bindings (for [p params+alias :when (vector? p) :let [[v f alias] p]]
-                   [v (cond
-                        (regex? f) (list `re-matches f alias)
-                        (string? f) `(when (= ~f ~alias) ~f)
-                        :else (list f alias))])]
-    [simple-route (vec args) bindings]))
+        validators (for [p params+alias :when (vector? p) :let [[v f alias] p]]
+                     [v (cond
+                          (regex? f) (list `re-matches f alias)
+                          (string? f) `(when (= ~f ~alias) ~f)
+                          :else (list f alias))])]
+    [simple-route (vec args) validators]))
 
 (defn- compile-handler-shorthand [form]
   (cond
@@ -83,18 +88,19 @@
                   
 (defn- compile-route [segments [route form]]
   (let [handler (compile-handler-shorthand form) 
-        [simple-route args bindings] (extract-args route)
-        etc-sym (when (prefix-route? route) (gensym "etc"))
-        handler (if etc-sym `(alter-request ~handler assoc :uri (uri ~etc-sym)) handler)
-        args (if etc-sym (conj args etc-sym) args)
-        emit-bindings 
-          (fn emit-bindings [bindings]
-            (if-let [[binding & etc] (seq bindings)]
-              `(when-let ~binding
-                 ~(emit-bindings etc))
-              handler))]
+        etc-sym (gensym "etc")
+        [fixed-route tail-binding] (split-route route etc-sym)
+        [simple-fixed-route args validators] (extract-args fixed-route)
+        simple-route (if tail-binding 
+                       (concat simple-fixed-route ['&]) 
+                       simple-fixed-route)  
+        args (if tail-binding (conj args tail-binding) args)
+        handler (if (= tail-binding etc-sym) 
+                  `(alter-request ~handler assoc :uri (uri ~etc-sym)) 
+                  handler)
+        emit-validator (fn [body validator] `(when-let ~validator ~body))]
     `(when-let [~args (match-route ~segments '~simple-route)]
-       ~(emit-bindings bindings)))) 
+       ~(reduce emit-validator handler (reverse validators))))) 
 
 (defn- compile-router [forms]
   (let [segments (gensym "segments")
