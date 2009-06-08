@@ -1,0 +1,65 @@
+<html>
+<head>
+<title>Moustache syntax</title>
+<style type='text/css'>
+	code {font-style: normal; font-weight: bold; color: black; background-color: #eee}
+	.syntax { color: #666; font-style: italic;}
+	.syntax dd:before {content: "| "}
+	.css-equiv {font-size: 60%}
+	h3 {margin: 0; font-size: 100%;}
+	pre {margin: 0; margin-left: 1ex; color: #666;}
+	dt {margin-top: 1ex;}</style>
+</head>
+<body>
+<h1>Moustache syntax</h1>
+<dl class="syntax">
+<dt id="app-handler"><a href="#app-handler">app-handler</a></dt>
+	<dd><code>(app</code> <a href="#handler-body">handler-body</a><code>)</code></dd>
+	
+<dt id="handler-body"><a href="#handler-body">handler-body</a></dt>
+	<dd><a href="#middleware">middleware</a>* <a href="#handler-main">handler-main</a></dd>
+	
+<dt id="middleware"><a href="#middleware">middleware</a></dt>
+    <dd><code>a-symbol</code> ; must evaluate to a function taking a handler and returning a handler</dd>
+	<dd><code>(some clojure code)</code> ; (some XXX clojure code) must evaluate to a handler — where XXX is the handler to wrap</dd>
+	
+<dt id="handler-main"><a href="#handler-main">handler-main</a></dt>
+	<dd>(<a href="#route">route</a> <a href="#shorthand-or-handler">shorthand-or-handler</a>)+ ; route-based dispatch</dd>
+	<dd><a href="#method-dispatch">method-dispatch</a></dd>
+	<dd><code>{a-literal ring-response-map}</code></dd>
+	<dd><code>"a-string"</code> clojure-expr* ; send a response whose body is (str "a-string" ...)</dd>  
+	<dd><code>a-symbol</code> ; must evaluate to a handler</dd>
+	<dd><code>(some clojure code)</code> ; must evaluate to a handler</dd>
+	
+<dt id="route"><a href="#route">route</a></dt>
+	<dd><code>[</code><a href="#segment">segment</a>* (<code>&</code> <a href="#tail-binding">tail-binding</a>?)?<code>]</code></dd>
+	
+<dt id="segment"><a href="#segment">segment</a></dt>
+	<dd><code>"a-string"</code></dd>
+	<dd><code>#"a-pattern"</code></dd>
+	<dd><code>a-symbol</code> ; when the route matches, is locally bound to the matching segment</dd>
+	<dd><code>[a-symbol-or-destructuring-form</code> <a href="#validator">validator</a><code>]</code></dd>
+	
+<dt id="validator"><a href="#validator">validator</a></dt>
+	<dd><code>"a-string"</code> ; shorthand for #{"a-string"}</dd>
+	<dd><code>#"a-pattern"</code> ; shorthand for #(re-matches #"a-pattern" %)</dd>
+	<dd><code>a-symbol</code> ; must evaluate to a function</dd>
+	<dd><code>(some clojure code)</code> ; must evaluate to a function</dd>
+	
+<dt id="tail-binding"><a href="#tail-binding">tail-binding</a></dt>
+	<dd><code>a-symbol</code></dd>
+	<dd><code>[a destructuring & form]</code></dd>
+
+<dt id="method-dispatch"><a href="#method-dispatch">method-dispatch</a></dt>
+	<dd>(<code>:http-method-keyword</code> <a href="#shorthand-or-handler">shorthand-or-handler</a>)+ ; method-based dispatch, :http-method-keyword are lowercase and can also be :any</dd>
+	
+<dt id="shorthand-or-handler"><a href="#shorthand-or-handler">shorthand-or-handler</a></dt>
+	<dd><code>[</code><a href="#handler-body">handler-body</a><code>]</code></dd>
+	<dd><code>{</code><a href="#method-dispatch">method-dispatch</a><code>}</code></dd>
+	<dd><code>"a-string"</code></dd>
+	<dd><code>a-symbol</code> ; must evaluate to a handler</dd>
+	<dd><code>(some clojure code)</code> ; must evaluate to a handler</dd>
+	
+</dl>
+</body>
+</htmL>
