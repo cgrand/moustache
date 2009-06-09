@@ -12,6 +12,10 @@ Well, there's only one macro you need to know: @app@.
 
 Every other public var is public only because @app@ needs it in its expansion.
 
+h2. Syntax
+
+See "syntax.html":http://moustache.cgrand.net/syntax.html
+
 h2. Walkthrough
 
 http://gist.github.com/109955
