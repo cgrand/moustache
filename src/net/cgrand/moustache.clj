@@ -156,6 +156,12 @@
       `(-> ~handler ~@middlewares)
       handler))) 
 
+(defn delegate
+ "Take a function and all the normal arguments to f but the first, and returns
+  a 1-argument fn."
+ [f & args]
+  #(apply f % args))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;    
 (comment
  ; an app can simply wrap a handler
