@@ -9,7 +9,7 @@
   <scm>
     <connection>scm:git:git://github.com/cgrand/moustache.git</connection>
     <developerConnection>scm:git:ssh://git@github.com/cgrand/moustache.git</developerConnection>
-    <tag>c142db5da394cf0e6990071bea147adfc1d6d652</tag>
+    <tag>f90d714e6d201bea669c10a0ad5f41a5c7436e05</tag>
     <url>http://github.com/cgrand/moustache</url>
   </scm>
   <repositories>
@@ -34,12 +34,12 @@
     <dependency>
       <groupId>org.clojure</groupId>
       <artifactId>clojure</artifactId>
-      <version>1.1.0-master-SNAPSHOT</version>
+      <version>[1.1.0,)</version>
     </dependency>
     <dependency>
       <groupId>ring</groupId>
       <artifactId>ring-core</artifactId>
-      <version>0.2.0-RC2</version>
+      <version>[0.2.0,)</version>
     </dependency>
   </dependencies>
 </project>
