@@ -9,7 +9,8 @@
 ;   You must not remove this notice, or any other, from this software.
 
 (ns net.cgrand.moustache
- "Moustache is a micro web framework/internal DSL to wire Ring handlers and middlewares.")
+ "Moustache is a micro web framework/internal DSL to wire Ring handlers and middlewares."
+ (:require [ring.middleware [params :as p] [keyword-params :as kwp]]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -142,19 +143,31 @@
  [& forms]
   (let [[middlewares etc] (split-with #(or (seq? %) (symbol? %)) forms)
         middlewares (reverse middlewares)
-        [middlewares [x :as etc]] 
+        [middlewares etc] 
           (if (seq etc) 
             [middlewares etc]
             [(rest middlewares) (list (first middlewares))])
-        handler (cond
-                  (string? x) (compile-text etc)
-                  (vector? x) (compile-router etc)
-                  (keyword? x) (compile-method-dispatch etc)
-                  (map? x) (compile-response-map x)
-                  :else x)]
+        [params-map etc] (let [[x & xs] etc]
+                           (if (and xs (map? x))
+                             [x xs]
+                             [nil etc]))
+        handler (let [x (first etc)]
+                  (cond
+	                  (string? x) (compile-text etc)
+	                  (vector? x) (compile-router etc)
+	                  (keyword? x) (compile-method-dispatch etc)
+	                  (map? x) (compile-response-map x)
+	                  :else x))
+        handler (if params-map 
+                  `(fn self# [request#] 
+                     (if-let [params# (:params request#)]
+                       (let [~params-map params#]
+                         (~handler request#))
+                       ((-> self# kwp/wrap-keyword-params p/wrap-params) request#)))
+                  handler)]
     (if (seq middlewares)
       `(-> ~handler ~@middlewares)
-      handler))) 
+      handler)))
 
 (defn delegate
  "Take a function and all the normal arguments to f but the first, and returns

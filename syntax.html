@@ -17,7 +17,7 @@
 	<dd><code>(app</code> <a href="#handler-body">handler-body</a><code>)</code></dd>
 	
 <dt id="handler-body"><a href="#handler-body">handler-body</a></dt>
-	<dd><a href="#middleware">middleware</a>* <a href="#handler-main">handler-main</a></dd>
+	<dd><a href="#middleware">middleware</a>* <code>{params destructuring-map}</code>? <a href="#handler-main">handler-main</a> ; the destructuring map acts against :params -- when no :params key to be found, try to parse params from url or body (url-encoded form), the resulting map is keyed by keywords, not by strings.</dd>
 	
 <dt id="middleware"><a href="#middleware">middleware</a></dt>
     <dd><code>a-symbol</code> ; must evaluate to a function taking a handler and returning a handler</dd>
