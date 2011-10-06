@@ -14,11 +14,21 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defn ^String path-info [req] (or (:path-info req) (:uri req)))
+
+(defn- segments [^String path]
+  (rest (map #(java.net.URLDecoder/decode % "UTF-8") (.split path "/" -1))))
+
 (defn uri-segments
  "Splits the uri of the given request map around / and decode segments." 
- [{:keys [#^String uri]}]
-  (rest (map #(java.net.URLDecoder/decode % "UTF-8") (.split uri "/" -1))))
-  
+ [req]
+  (segments (:uri req)))
+
+(defn path-info-segments
+ "Splits the path-info of the given request map around / and decode segments." 
+ [req]
+  (segments (path-info req)))
+
 (defn uri
  "Turns a seq of decoded segment into an uri."  
  [segments]
@@ -97,7 +107,7 @@
                        simple-fixed-route)  
         args (if tail-binding (conj args tail-binding) args)
         handler (if (= tail-binding etc-sym) 
-                  `(alter-request ~handler assoc :uri (uri ~etc-sym)) 
+                  `(alter-request ~handler assoc :path-info (uri ~etc-sym)) 
                   handler)
         emit-validator (fn [body validator] `(when-let ~validator ~body))]
     `(when-let [~args (match-route ~segments '~simple-route)]
@@ -115,7 +125,7 @@
                      `(when-let [handler# ~(compile-route segments route+form)]
                         (handler# ~req)))] 
     `(fn [~req] 
-       (let [~segments (uri-segments ~req)]
+       (let [~segments (path-info-segments ~req)]
          (or ~@(map emit-match routes+forms))))))
 
 (defn- method-not-allowed-form [allowed-methods]

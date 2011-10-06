@@ -1,0 +1,2 @@
+1.1.0
+:uri is not altered anymore by nested routes. :path-info holds the remaining path..

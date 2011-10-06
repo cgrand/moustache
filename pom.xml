@@ -3,15 +3,12 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>net.cgrand</groupId>
   <artifactId>moustache</artifactId>
-  <version>1.0.0</version>
+  <version>1.1.0</version>
   <name>moustache</name>
   <description>a micro web framework/internal DSL to wire Ring handlers and middlewares</description>
   <url>http://github.com/cgrand/moustache/</url>
   <scm>
-    <connection>scm:git:git://github.com/cgrand/moustache.git</connection>
-    <developerConnection>scm:git:ssh://git@github.com/cgrand/moustache.git</developerConnection>
-    <tag>c2a8adef899f08b0847b1e7feb9d2367efdbbbf7</tag>
-    <url>https://github.com/cgrand/moustache</url>
+    <tag>c7d445adaa233d3840b95d23716a7433a5648c96</tag>
   </scm>
   <build>
     <sourceDirectory>src</sourceDirectory>
@@ -55,6 +52,12 @@
       <groupId>ring</groupId>
       <artifactId>ring-core</artifactId>
       <version>[0.2.0,)</version>
+    </dependency>
+    <dependency>
+      <groupId>ring</groupId>
+      <artifactId>ring</artifactId>
+      <version>[0.2.0,)</version>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 </project>
