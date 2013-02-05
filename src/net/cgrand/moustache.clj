@@ -42,11 +42,13 @@
       :else [route nil])
     [[""] nil]))
 
-(def #^{:doc "Handler that causes the framework to fall through the next handler"} 
-  pass (constantly nil))
+(def pass
+  "Handler that causes the framework to fall through the next handler"
+  (constantly nil))
 
-(def #^{:doc "Handler that always return a 404 Not Found status."} 
-  not-found (constantly {:status 404}))
+(def not-found
+  "Handler that always return a 404 Not Found status."
+  (constantly {:status 404}))
 
 (defn alter-request
  "Middleware that passes (apply f request args) to handler instead of request." 
@@ -91,12 +93,52 @@
                           :else (list f alias))])]
     [simple-route (vec args) validators]))
 
+(defn- wrap-middlewares [handler middlewares]
+  `(-> ~handler ~@(reverse middlewares)))
+
+(defn apply-middleware-when-not 
+  "Middleware which applies another middleware when the predicate returns false
+   when called on the request map."
+  [h pred mw & args]
+  (let [wh (apply mw h args)] 
+    (fn [req]
+      ((if (pred req) h wh) req))))
+
+(defn- wrap-params [handler params]
+  (let [params (if (vector? params) {:keys params} params)]
+    (if params
+      `(apply-middleware-when-not 
+         (fn  [request#] 
+           (let [~params (:params request#)]
+             (~handler request#)))
+         :params (comp p/wrap-params kwp/wrap-keyword-params))
+      handler)))
+
+(declare compile-router compile-method-dispatch-map)
+
+(defn- compile-handler-map-shorthand [m]
+  (let [{:keys [response params handler middlewares]} m
+        m (dissoc m :response :params :handler :middlewares)
+        routes (filter (comp vector? key) m)
+        methods (filter (comp keyword? key) m)
+        method-dispatch (when (seq methods) 
+                          (compile-method-dispatch-map (into {} methods)))
+        response (when response `(fn [_#] ~response))        
+        here-handler (or method-dispatch handler response (m []))
+        routes (if (and here-handler (seq routes))
+                 (assoc (into {} routes) [] here-handler)
+                 routes)
+        handler (if (seq routes) 
+                  (compile-router (apply concat routes))
+                  here-handler)]
+    (-> handler (wrap-params params) (wrap-middlewares  middlewares))))
+
 (defn- compile-handler-shorthand [form]
   (cond
     (vector? form) `(app ~@form)
-    (map? form) `(app ~@(apply concat form)) 
+    (map? form) (compile-handler-map-shorthand form) 
     :else `(app ~form)))
-                  
+
 (defn- compile-route [segments [route form]]
   (let [handler (compile-handler-shorthand form) 
         etc-sym (gensym "etc")
@@ -132,25 +174,31 @@
   (let [allow (apply str (interpose ", " (map #(.toUpperCase (name %) java.util.Locale/ENGLISH) allowed-methods)))]
     `(constantly {:status 405 :headers {"Allow" ~allow}})))  
 
-(defn- compile-method-dispatch [spec]
-  (let [spec (apply hash-map spec)
-        else-form (:any spec)
+(defn- compile-method-dispatch-map [spec]
+  (let [else-form (:any spec)
         spec (dissoc spec :any)
         else-form (or else-form (method-not-allowed-form (keys spec)))] 
     `(fn [req#]
-       ((condp = (:request-method req#)
+       ((case (:request-method req#)
           ~@(mapcat (fn [[k v]] [k (compile-handler-shorthand v)]) spec)
           ~else-form) req#))))
 
+(defn- compile-method-dispatch [spec]
+  (compile-method-dispatch-map (apply hash-map spec)))
+
+(defn text
+  "Returns a 200 response map whose content-type is text and body is 
+  (apply str args)."
+  [& args]
+  {:status 200 :headers {"Content-Type" "text/plain;charset=UTF-8"} :body (apply str args)})
+
 (defn- compile-text [s]
-  `(fn [_#] {:status 200 :headers {"Content-Type" "text/plain;charset=UTF-8"} :body (str ~@s)}))
+  `(fn [_#] (text ~@s)))
         
 (defn compile-response-map [m]
   `(fn [_#] ~m))
-        
-(defmacro app
- "The main form."
- [& forms]
+
+(defn- legacy-app [forms]
   (let [[middlewares etc] (split-with #(or (seq? %) (symbol? %)) forms)
         middlewares (reverse middlewares)
         [middlewares etc] 
@@ -169,15 +217,18 @@
 	                  (map? x) (compile-response-map x)
 	                  :else x))
         handler (if params-map 
-                  `(fn self# [request#] 
-                     (if-let [params# (:params request#)]
-                       (let [~params-map params#]
-                         (~handler request#))
-                       ((-> self# kwp/wrap-keyword-params p/wrap-params) request#)))
+                  (wrap-params handler params-map)
                   handler)]
     (if (seq middlewares)
       `(-> ~handler ~@middlewares)
       handler)))
+
+(defmacro app
+ "The main form."
+ [& forms]
+ (if (keyword? (first forms))
+   (compile-handler-map-shorthand (apply hash-map forms))
+   (legacy-app forms)))
 
 (defn delegate
  "Take a function and all the normal arguments to f but the first, and returns
@@ -192,23 +243,31 @@
    (fn [req] {:status 200 :headers {"Content-Type" "text/html"}
               :body "<h3>Hello World</h3>"}))
         
+ ; but when you don't care about the request map, you simply specify
+ ; a response (which can be any expression evaluating to a map
+ (app
+   :response {:status 200 :headers {"Content-Type" "text/html"}
+              :body "<h3>Hello World</h3>"})
+
+ ; in truth when the response expression is itslef a map, you may
+ ; omit :response 
+ (app
+   {:status 200 :headers {"Content-Type" "text/html"}
+    :body "<h3>Hello World</h3>"})
+ 
  ; an app can declare routes
  (app
    ["hello" name]
      (fn [req] {:status 200 :headers {"Content-Type" "text/html"}
                 :body (str "<h3>Hello " name "</h3>")}))
-                
+ 
  ; routes can be nested:
  (app
    ["hello" &]
      (app
        [name]
-         (fn [req] {:status 200 :headers {"Content-Type" "text/html"}
-                  :body (str "<h3>Hello " name "</h3>")})))
- 
- ; params can be parsed/validated
- (app
-   ["by-date" [[year month day] parse-date]] ...)
+         (app {:status 200 :headers {"Content-Type" "text/html"}
+               :body (str "<h3>Hello " name "</h3>")})))
  
  ; and hence composed:
  (def by-name
@@ -221,25 +280,81 @@
    ["hello" &] by-name
    ["greet" &] by-name)
  
- ;an app knows about methods: (without any, you get a 405 method Not Allowed)
-  (app
-    :get (fn [req] {:status 200 :headers {"Content-Type" "text/html"}
-                  :body (str "GET!")})
-    :post (fn [req] {:status 200 :headers {"Content-Type" "text/html"}
-                  :body (str "POST!")}
-    :any (fn [req] {:status 200 :headers {"Content-Type" "text/html"}
-                  :body (str "ANYTHING ELSE!")}))
+ ; nested app forms can be shortened as maps
+ (app
+   ["hello" name]
+     {:response {:status 200 :headers {"Content-Type" "text/html"}
+                 :body (str "<h3>Hello " name "</h3>")}})
+
+ (app
+   ["hello" &]
+     {[name]
+        {:response {:status 200 :headers {"Content-Type" "text/html"}
+                    :body (str "<h3>Hello " name "</h3>")}}})
  
+ ; or as vectors for maximal terseness
+ (app
+   ["hello" name]
+     [{:status 200 :headers {"Content-Type" "text/html"}
+       :body (str "<h3>Hello " name "</h3>")}])
+
+ (app
+   ["hello" &]
+     [[name]
+        [{:status 200 :headers {"Content-Type" "text/html"}
+          :body (str "<h3>Hello " name "</h3>")}]])
  
- ;an app can use existing middlewares (eg from compojure)
+ ; params can be parsed/validated
+ (app
+   ["by-date" [[year month day] parse-date]] ...)
+ 
+ ; an app knows about methods: (without any, you get a 405 method Not Allowed)
   (app
-    with-multipart
-    (with-session :memory)
+    :get (app {:status 200 :headers {"Content-Type" "text/html"}
+               :body (str "GET!")})
+    :post (app {:status 200 :headers {"Content-Type" "text/html"}
+                :body (str "POST!")})
+    :any (app {:status 200 :headers {"Content-Type" "text/html"}
+               :body (str "ANYTHING ELSE!")}))
+
+ ; an app can use existing middlewares (eg from compojure)
+ (app
+   with-multipart
+   (with-session :memory)
+   ["account" &]
+     (app
+       [] {:get (show-account (session :user))}
+       ["upload-avatar"] {:post (save-upload-avatar (params :avatar-upload))}))  
+
+ ; middlewares can also be declared using the keyword syntax:
+  (app
+    :middlewares [with-multipart
+                  (with-session :memory)]
     ["account" &]
-      (app
-        [] {:get (show-account (session :user))}
-        ["upload-avatar"] {:post (save-upload-avatar (params :avatar-upload))})))  
-    
+      {[] {:get (show-account (session :user))}
+       ["upload-avatar"] {:post (save-upload-avatar (params :avatar-upload))}})  
+ 
+ ; you can destructure params too:
+ (app
+   {:keys [name]}
+   ["hello"]
+     [{:status 200 :headers {"Content-Type" "text/html"}
+       :body (str "<h3>Hello " name "</h3>")}])
+ 
+ ; or again using a keyword syntax:
+ (app
+   :params {:keys [name]}
+   ["hello"]
+     [{:status 200 :headers {"Content-Type" "text/html"}
+       :body (str "<h3>Hello " name "</h3>")}])
+ 
+ ; and in this case this can even be:
+ (app
+   :params [name]
+   ["hello"]
+     [{:status 200 :headers {"Content-Type" "text/html"}
+       :body (str "<h3>Hello " name "</h3>")}])
+ 
 )    
     
     

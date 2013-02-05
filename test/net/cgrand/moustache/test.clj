@@ -25,11 +25,16 @@
 
 (deftest wrapping
   (is (found+content (app hello) "/random/url"))
-  (is (found+content (app (fn [req] (hello req))) "/random/url")))
+  (is (found+content (app (fn [req] (hello req))) "/random/url"))
+  (is (found+content (app :handler (fn [req] (hello req))) "/random/url")))
   
 (deftest response-literal
   (is (= "literal response"
         (found+content (app {:status 200
+                             :body "literal response"}) "/random/url")))
+  (is (= "literal response"
+        (found+content (app :response
+                            {:status 200
                              :body "literal response"}) "/random/url"))))
   
 (deftest fixed-route-dispatch      
@@ -84,17 +89,34 @@
 (deftest nested-apps
   (is (found+content (app ["foo" &] [["bar"] "ok"]) "/foo/bar"))
   (is (not+found (app ["foo" &] [["bar"] "ok"]) "/foo/baz"))
-  (is (not+found (app ["foo" &] [["bar"] "ok"]) "/foe/bar")))
+  (is (not+found (app ["foo" &] [["bar"] "ok"]) "/foe/bar"))
+  (is (found+content (app ["foo" &] {["bar"] "ok"}) "/foo/bar"))
+  (is (not+found (app ["foo" &] {["bar"] "ok"}) "/foo/baz"))
+  (is (not+found (app ["foo" &] {["bar"] "ok"}) "/foe/bar")))
   
 (deftest middlewares
   (is (= {:status 200, :headers {"Content-Type" "text/html"}, :body "<h3>not text!</h3>"} 
         (request (app (alter-response assoc-in [:headers "Content-Type"] "text/html") "<h3>not text!</h3>") "/")))
   (is (found+content (app (alter-request update-in [:uri] #(str "/foo" %)) ["foo" "bar"] "ok") "/bar"))  
-  (is (not+found (app (alter-request update-in [:uri] #(str "/foo" %)) ["foo" "bar"] "ok") "/foo/bar")))
+  (is (not+found (app (alter-request update-in [:uri] #(str "/foo" %)) ["foo" "bar"] "ok") "/foo/bar"))
+  (is (= {:status 200, :headers {"Content-Type" "text/html"}, :body "<h3>not text!</h3>"} 
+        (request (app :middlewares [(alter-response assoc-in [:headers "Content-Type"] "text/html")]
+                      :response (text "<h3>not text!</h3>")) "/")))
+  (is (found+content (app :middlewares [(alter-request update-in [:uri] #(str "/foo" %))]
+                          ["foo" "bar"] "ok") "/bar"))  
+  (is (not+found (app :middlewares [(alter-request update-in [:uri] #(str "/foo" %))]
+                      ["foo" "bar"] "ok") "/foo/bar")))
 
 (deftest params
   (is (= {:body "bar/bat%"}
         ((app {:keys [foo biz]} {:body (str foo "/" biz)}) {:query-string "foo=bar&biz=bat%25"})))           
   (is (= {:body "/"}
         ((app {:keys [foo biz]} {:body (str foo "/" biz)}) {:query-string "foo=bar&biz=bat%25"
+                                                            :params {}})))
+  (is (= {:body "bar/bat%"}
+        ((app :params [foo biz]
+              :response {:body (str foo "/" biz)}) {:query-string "foo=bar&biz=bat%25"})))           
+  (is (= {:body "/"}
+        ((app :params [foo biz]
+              :response {:body (str foo "/" biz)}) {:query-string "foo=bar&biz=bat%25"
                                                             :params {}}))))
