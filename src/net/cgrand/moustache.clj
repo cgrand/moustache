@@ -177,7 +177,8 @@
 (defn- compile-method-dispatch-map [spec]
   (let [else-form (:any spec)
         spec (dissoc spec :any)
-        else-form (or else-form (method-not-allowed-form (keys spec)))] 
+        else-form (if else-form (compile-handler-shorthand else-form) 
+                    (method-not-allowed-form (keys spec)))] 
     `(fn [req#]
        ((case (:request-method req#)
           ~@(mapcat (fn [[k v]] [k (compile-handler-shorthand v)]) spec)

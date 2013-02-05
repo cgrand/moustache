@@ -78,6 +78,7 @@
   
 (deftest method-dispatch
   (is (found+content (app :get "ok") "/" :request-method :get))
+  (is (found+content (app :any "ok") "/" :request-method :get))
   (is (= {:status 405, :headers {"Allow" "GET"}} (request (app :get "ok") "/" :request-method :post)))
   (is (= {:status 405, :headers {"Allow" "GET"}} (request (app :get "ok") "/" :request-method :put)))
   (is (= {:status 405, :headers {"Allow" "GET"}} (request (app :get "ok") "/" :request-method :head))))
