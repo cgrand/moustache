@@ -1,0 +1,94 @@
+<html>
+<head>
+<title>Moustache syntax</title>
+<style type='text/css'>
+	code {font-style: normal; font-weight: bold; color: black; background-color: #eee}
+	.syntax { color: #666; font-style: italic;}
+	.syntax dd:before {content: "| "}
+	.css-equiv {font-size: 60%}
+	h3 {margin: 0; font-size: 100%;}
+	pre {margin: 0; margin-left: 1ex; color: #666;}
+	dt {margin-top: 1ex;}
+	em {background-color: #ff8;}</style>
+</head>
+<body>
+<h1><a href="http://github.com/cgrand/moustache/tree/master">Moustache</a> syntax</h1>
+<dl class="syntax">
+<dt id="app-handler"><a href="#app-handler">app-handler</a></dt>
+  <dd><code>(app</code> <a href="#handler-body">handler-body</a><code>)</code>
+
+<dt id="handler-body"><a href="#handler-body">handler-body</a></dt>
+  <dd>(?=<code>:keyword</code>)
+      <a href="#modern-handler-body">modern-handler-body</a>
+      ; if the body starts by a keyword, it's a "modern" body</dd>
+  <dd>(?!<code>:keyword</code>)
+      <a href="#legacy-handler-body">legacy-handler-body</a>
+      ; if the body starts by anything else than a keyword it's a "legacy" body</dd>
+	
+<dt id="modern-handler-body"><a href="#modern-handler-body">modern-handler-body</a></dt>
+  <dd><a href="#app-entry">app-entry</a>*</dd>
+
+<dt id="app-entry"><a href="#app-entry">app-entry</a></dt>
+  <dd><code>:middlewares</code> <code>[</code><a href="#middleware">middleware</a>*<code>]</code>
+  <dd><code>:params</code> <code>{params destructuring-map}</code>
+  <dd><code>:params</code> <code>[</code> <code>symbol</code>* <code>]</code> ; equivalent to {:keys [symbols...]}
+  <dd><a href="#method-dispatch-entry">method-dispatch-entry</a>
+  <dd><a href="#route-entry">route-entry</a> ; note that <em>in a "modern" body, the route order is irrelevant: no more cascading</em>
+  <dd><code>:handler</code> <code>clojure-code</code> ; clojure expression evaluating to a handler
+  <dd><code>:response</code> <code>clojure-code</code> ; clojure expression evaluating to a response map 
+	
+<dt id="middleware"><a href="#middleware">middleware</a></dt>
+    <dd><code>a-symbol</code> ; must evaluate to a function taking a handler and returning a handler</dd>
+	<dd><code>(some clojure code)</code> ; (some XXX clojure code) must evaluate to a handler — where XXX is the handler to wrap</dd>
+	
+<dt id="route-entry"><a href="#route-entry">route-entry</a></dt>	
+	<dd><a href="#route">route</a> <a href="#shorthand-or-handler">shorthand-or-handler</a> ; route-based dispatch
+	
+<dt id="route"><a href="#route">route</a></dt>
+	<dd><code>[</code><a href="#segment">segment</a>* (<code>&</code> <a href="#tail-binding">tail-binding</a>?)?<code>]</code></dd>
+	
+<dt id="segment"><a href="#segment">segment</a></dt>
+	<dd><code>"a-string"</code></dd>
+	<dd><code>#"a-pattern"</code></dd>
+	<dd><code>a-symbol</code> ; when the route matches, is locally bound to the matching segment</dd>
+	<dd><code>[a-symbol-or-destructuring-form</code> <a href="#validator">validator</a><code>]</code></dd>
+	
+<dt id="validator"><a href="#validator">validator</a></dt>
+	<dd><code>"a-string"</code> ; shorthand for #{"a-string"}</dd>
+	<dd><code>#"a-pattern"</code> ; shorthand for #(re-matches #"a-pattern" %)</dd>
+	<dd><code>a-symbol</code> ; must evaluate to a function</dd>
+	<dd><code>(some clojure code)</code> ; must evaluate to a function</dd>
+	
+<dt id="tail-binding"><a href="#tail-binding">tail-binding</a></dt>
+	<dd><code>a-symbol</code></dd>
+	<dd><code>[a destructuring & form]</code></dd>
+
+<dt id="method-dispatch"><a href="#method-dispatch">method-dispatch</a></dt>
+  <dd><a href="#method-dispatch-entry">method-dispatch-entry</a>+ 
+
+<dt id="method-dispatch-entry"><a href="#method-dispatch-entry">method-dispatch-entry</a></dt>
+  <dd><code>:http-method-keyword</code> <a href="#shorthand-or-handler">shorthand-or-handler</a> ; method-based dispatch, :http-method-keyword are lowercase and can also be :any</dd>
+	
+<dt id="shorthand-or-handler"><a href="#shorthand-or-handler">shorthand-or-handler</a></dt>
+  <dd><code>{</code><a href="#modern-handler-body">modern-handler-body</a><code>}</code></dd>
+	<dd><code>[</code><a href="#handler-body">handler-body</a><code>]</code></dd>
+	<dd><code>"a-string"</code></dd>
+	<dd><code>a-symbol</code> ; must evaluate to a handler</dd>
+	<dd><code>(some clojure code)</code> ; must evaluate to a handler</dd>
+
+<hr>; rules below are not deprecated (not yet) but clearly not the way forward
+
+<dt id="legacy-handler-body"><a href="#legacy-handler-body">legacy-handler-body</a></dt>
+  <dd><a href="#middleware">middleware</a>* <code>{params destructuring-map}</code>? <a href="#handler-main">handler-main</a> ; the destructuring map acts against :params -- when no :params key to be found, try to parse params from url or body (url-encoded form), the resulting map is keyed by keywords, not by strings.</dd>
+
+<dt id="handler-main"><a href="#handler-main">handler-main</a></dt>
+  <dd><a href="#route-entry">route-entry</a>+</dd>
+  <dd><a href="#method-dispatch">method-dispatch</a></dd>
+  <dd><code>{a-literal ring-response-map}</code></dd>
+  <dd><code>"a-string"</code> clojure-expr* ; send a response whose body is (str "a-string" ...)</dd>  
+  <dd><code>a-symbol</code> ; must evaluate to a handler</dd>
+  <dd><code>(some clojure code)</code> ; must evaluate to a handler</dd>
+	
+</dl>
+</body>
+</htmL>
