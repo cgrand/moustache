@@ -1,0 +1,165 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Moustache by cgrand</title>
+
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1>Moustache</h1>
+        <p>a micro web framework/internal DSL to wire Ring handlers and middlewares</p>
+
+        <p class="view"><a href="https://github.com/cgrand/moustache">View the Project on GitHub <small>cgrand/moustache</small></a></p>
+
+
+        <ul>
+          <li><a href="https://github.com/cgrand/moustache/zipball/master">Download <strong>ZIP File</strong></a></li>
+          <li><a href="https://github.com/cgrand/moustache/tarball/master">Download <strong>TAR Ball</strong></a></li>
+          <li><a href="https://github.com/cgrand/moustache">View On <strong>GitHub</strong></a></li>
+        </ul>
+      </header>
+      <section>
+        <p>h1. Moustache</p>
+
+<pre>
+  (app ["hi"] {:get "Hello World!"})
+</pre>
+
+<p>Moustache is a micro web framework/internal DSL to wire Ring handlers and middlewares.</p>
+
+<p>h2. How micro is it?</p>
+
+<p>Well, there's only one macro you need to know: <a href="https://github.com/app" class="user-mention">@app</a>@. </p>
+
+<p>Every other public var is public only because <a href="https://github.com/app" class="user-mention">@app</a>@ needs it in its expansion.</p>
+
+<p>h2. Syntax</p>
+
+<p>See "syntax.html":<a href="http://moustache.cgrand.net/syntax.html">http://moustache.cgrand.net/syntax.html</a></p>
+
+<p>h2. Walkthrough</p>
+
+<p><a href="http://gist.github.com/109955">http://gist.github.com/109955</a></p>
+
+<p>h2. The <a href="https://github.com/app" class="user-mention">@app</a>@ macro</p>
+
+<p>A @(app ...)@ form returns a Ring application (handler).</p>
+
+<p>There's currently four usages of <a href="https://github.com/app" class="user-mention">@app</a>@:</p>
+
+<ul>
+<li>to wrap a Ring handler,</li>
+<li>to define routes,</li>
+<li>to dispatch on HTTP methods</li>
+<li>and to render plain text.</li>
+</ul><p>h3. Wrapping an existing Ring handler</p>
+
+<pre>
+  (app my-handler) ; identity, returns my-handler
+</pre> 
+
+<p>You can simply wrap a handler into middlewares:</p>
+
+<pre>
+  (app
+    middleware1
+    (middleware2 arg)
+    my-handler)
+  ; equivalent to (-&gt; my-handler (middleware2 arg) middleware1)
+  ; ie (middleware1 (middleware2 my-handler arg))
+</pre>
+
+<p>Note that <em>every usage of <a href="https://github.com/app" class="user-mention">@app</a>@ supports middleware-wrapping</em>.</p>
+
+<p>h3. Routes</p>
+
+<p>h4. Basics</p>
+
+<p>With Moustache you don't write routes as encoded uri (eg @"/Thank%20you%20Mario/But%20our%20princess%20is%20in%20another%20castle"@), you write vectors of decoded segments (eg @["Thank you Mario" "But our princess is in another castle"]@).</p>
+
+<pre>
+  (app ["foo"] my-handler) ; will route requests to "/foo" to my-handler
+  (app ["foo" ""] my-handler) ; will route requests to "/foo/" to my-handler
+  (app ["foo" "bar"] my-handler) ; will route requests to "/foo/bar" to my-handler
+  (app ["foo" &amp;] my-handler) ; will route requests to "/foo", "/foo/", "/foo/bar" and "/foo/bar/baz/" to my-handler (and will chop "/foo" off from the uri)
+  (app ["foo" name] my-handler) ; will route requests to "/foo/", "/foo/bar" to my-handler and bind @name@ (a local) to the matched segment (eg "" or "bar")
+  (app ["foo" x &amp; xs] my-handler) ; "/foo/bar/baz/bloom" will bind x to bar and xs to ["baz" "bloom"]
+</pre>
+
+<p>You can catch all URIs with the route <code>[&amp;]</code>. If you don't provide a handler for <code>[&amp;]</code> and there's no handler for a request Moustache sends a 404 (not found) response.</p>
+
+<p>h4. Route validation/destructuring</p>
+
+<pre>
+  (defn integer [s]
+   "returns nil if s does not represent an integer
+    (try 
+      (Integer/parseInt s)
+      (catch Exception e)))
+
+  (app ["order" [id integer]] my-handler) ; for "/order/134" @id@ will be bind to 134 (not "134"), this route will not match "/order/abc".
+  
+  (app ["agenda" [[_ year month day] #"(\d{4})-(\d{2})-(\d{2})"]] 
+    {:get [month "-" day "-" year " agenda"]})
+</pre>
+
+<p>h4. Fall through</p>
+
+<p>The routes are tried in order until one route matches the request uri <em>and</em> the associated handler does not return nil.</p>
+
+<p>That's why:</p>
+
+<pre>
+  (app 
+    ["foo" &amp;] (app ["bar"] handler1)
+    ["foo" "baz"] handler2)
+</pre>
+
+<p>returns a 404 for /foo/baz: the nested <a href="https://github.com/app" class="user-mention">@app</a>@ form returns a 404 for /baz and this 404 bubbles up.</p>
+
+<p>You can prevent such behavior by writing:</p>
+
+<pre>
+  (app 
+    ["foo" &amp;] (app 
+                ["bar"] handler1
+                [&amp;] pass)
+    ["foo" "baz"] handler2)
+</pre>
+
+<p>h3. Method dispatch</p>
+
+<pre>
+  (app
+    :get handler-for-get
+    :post handler-for-post)
+</pre>
+
+<p>You can add a catch-all using the :any keyword.</p>
+
+<p>If you don't specify a handler for :any, Moustache sends a 405 response (method not allowed).</p>
+
+<p>h3. Shorthands</p>
+
+<p>When the right-hand form of a route or of a method dispatch is a @(app ...)@ form, you can write the form as a vector: <code>(app <a href="app%20%5B%22bar%22%5D%20handler">"foo" &amp;</a>)</code> can be shortened to <code>(app ["foo" &amp;] [["bar"] handler])</code>.</p>
+
+<p>Besides when the right-hand form is a method dispatch without middlewares you can write the form as a map:  <code>(app <a>"foo"</a>)</code> can be shortened to <code>(app ["foo"] {:get handler})</code>.</p>
+      </section>
+      <footer>
+        <p>This project is maintained by <a href="https://github.com/cgrand">cgrand</a></p>
+        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
+      </footer>
+    </div>
+    <script src="javascripts/scale.fix.js"></script>
+    
+  </body>
+</html>
