@@ -44,7 +44,9 @@
   (is (found+content (app ["some" "url"] hello) "/some/url"))
   (is (not+found  (app ["some" "url"] hello) "/"))
   (is (not+found  (app ["some" "url"] hello) "/some/url/"))
-  (is (not+found  (app ["some" "url"] hello) "/some/url/foo")))
+  (is (not+found  (app ["some" "url"] hello) "/some/url/foo"))
+  
+  (is (found+content (app :middlewares [] ["a"] "a here" ["b"] "b here") "/a")))
   
 (deftest open-route-dispatch      
   (is (found+content (app ["some" "url" &] hello) "/some/url"))

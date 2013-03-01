@@ -156,7 +156,7 @@
        ~(reduce emit-validator handler (reverse validators))))) 
 
 (defn -nil-or-404? [resp]
-  (or nil? (= (:status resp) 404)))
+  (or (nil? resp) (= (:status resp) 404)))
 
 (defmacro -or404
   ([] nil)
