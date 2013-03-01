@@ -114,7 +114,7 @@
          :params (comp p/wrap-params kwp/wrap-keyword-params))
       handler)))
 
-(declare compile-router compile-method-dispatch-map)
+(declare compile-modern-router compile-method-dispatch-map)
 
 (defn- compile-handler-map-shorthand [m]
   (let [{:keys [response params handler middlewares]} m
@@ -129,8 +129,7 @@
                  (assoc (into {} routes) [] here-handler)
                  routes)
         handler (if (seq routes) 
-                  (let [routes (merge {'[&] `pass} routes)]
-                    (compile-router (apply concat routes)))
+                  (compile-modern-router (apply concat routes))
                   here-handler)]
     (-> handler (wrap-params params) (wrap-middlewares  middlewares))))
 
@@ -155,6 +154,30 @@
         emit-validator (fn [body validator] `(when-let ~validator ~body))]
     `(when-let [~args (match-route ~segments '~simple-route)]
        ~(reduce emit-validator handler (reverse validators))))) 
+
+(defn -nil-or-404? [resp]
+  (or nil? (= (:status resp) 404)))
+
+(defmacro -or404
+  ([] nil)
+  ([form] form)
+  ([form & forms]
+  `(let [resp# ~form]
+     (if (-nil-or-404? resp#)
+       (-or404 ~@forms)
+       resp#))))
+
+(defn- compile-modern-router [forms]
+  (let [segments (gensym "segments")
+        req (gensym "req")
+        routes+forms (partition 2 forms)
+        emit-match (fn [route+form]
+                     `(when-let [handler# ~(compile-route segments route+form)]
+                        (handler# ~req)))] 
+    `(fn [~req] 
+       (let [~segments (path-info-segments ~req)]
+         (or (-or404 ~@(map emit-match routes+forms))
+           (not-found))))))
 
 (defn- compile-router [forms]
   (let [segments (gensym "segments")
@@ -231,6 +254,7 @@
  (if (keyword? (first forms))
    (compile-handler-map-shorthand (apply hash-map forms))
    (legacy-app forms)))
+
 
 (defn delegate
  "Take a function and all the normal arguments to f but the first, and returns
