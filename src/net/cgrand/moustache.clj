@@ -129,7 +129,8 @@
                  (assoc (into {} routes) [] here-handler)
                  routes)
         handler (if (seq routes) 
-                  (compile-router (apply concat routes))
+                  (let [routes (merge {'[&] `pass} routes)]
+                    (compile-router (apply concat routes)))
                   here-handler)]
     (-> handler (wrap-params params) (wrap-middlewares  middlewares))))
 

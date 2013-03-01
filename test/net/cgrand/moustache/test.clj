@@ -105,8 +105,8 @@
                       :response (text "<h3>not text!</h3>")) "/")))
   (is (found+content (app :middlewares [(alter-request update-in [:uri] #(str "/foo" %))]
                           ["foo" "bar"] "ok") "/bar"))  
-  (is (not+found (app :middlewares [(alter-request update-in [:uri] #(str "/foo" %))]
-                      ["foo" "bar"] "ok") "/foo/bar")))
+  (is (nil? (request (app :middlewares [(alter-request update-in [:uri] #(str "/foo" %))]
+                       ["foo" "bar"] "ok") "/foo/bar"))))
 
 (deftest params
   (is (= {:body "bar/bat%"}
